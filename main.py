@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from sqlalchemy import Boolean, Float, Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from fastapi import Depends
 
 # ── Database setup ────────────────────────────────────────────────────────────
 
@@ -57,3 +58,46 @@ app = FastAPI(title="Micro Store API", lifespan=lifespan)
 @app.get("/")
 async def root():
     return {"message": "Micro Store API is running"}
+
+
+from pydantic import BaseModel
+from sqlalchemy import select
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+class ProductCreate(BaseModel):
+    name: str
+    sku: str
+    description: str | None = None
+    price: float
+    cost: float
+    stock_qty: int = 0
+    low_stock_threshold: int = 10
+
+class ProductResponse(BaseModel):
+    id: int
+    name: str
+    sku: str
+    description: str | None
+    price: float
+    cost: float
+    stock_qty: int
+    low_stock_threshold: int
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+@app.post("/products", response_model=ProductResponse)
+async def create_product(data: ProductCreate, db: AsyncSession = Depends(get_db)):
+    product = Product(**data.model_dump())
+    db.add(product)
+    await db.commit()
+    await db.refresh(product)
+    return product
+
+@app.get("/products", response_model=list[ProductResponse])
+async def get_products(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Product))
+    return result.scalars().all()
