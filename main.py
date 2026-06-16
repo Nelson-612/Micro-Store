@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from database import engine, Base
-from routers import products, customers
+from routers import products, customers, orders
 import models
 
 
@@ -16,6 +16,7 @@ app = FastAPI(title="Micro Store API", lifespan=lifespan)
 
 app.include_router(products.router)
 app.include_router(customers.router)
+app.include_router(orders.router)
 
 
 @app.get("/")

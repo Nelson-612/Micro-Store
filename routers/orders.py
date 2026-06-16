@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from database import get_db
 from models import Order, OrderItem, Product, Customer
@@ -30,7 +31,7 @@ async def create_order(data: OrderCreate, db: AsyncSession = Depends(get_db)):
     # Step 3 — create the order
     order = Order(customer_id=data.customer_id)
     db.add(order)
-    await db.flush()  # gets the order.id without committing yet
+    await db.flush()
 
     # Step 4 — create order items and deduct stock
     for item in data.items:
@@ -39,26 +40,38 @@ async def create_order(data: OrderCreate, db: AsyncSession = Depends(get_db)):
             order_id=order.id,
             product_id=item.product_id,
             quantity=item.quantity,
-            unit_price=product.price,  # snapshot the price
+            unit_price=product.price,
         )
         db.add(order_item)
-        product.stock_qty -= item.quantity  # deduct stock
+        product.stock_qty -= item.quantity
 
     # Step 5 — commit everything together
     await db.commit()
-    await db.refresh(order)
-    return order
+
+    # Step 6 — reload the order with items explicitly
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order.id)
+        .options(selectinload(Order.items))
+    )
+    return result.scalar_one()
 
 
 @router.get("", response_model=list[OrderResponse])
 async def get_orders(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Order))
+    result = await db.execute(
+        select(Order).options(selectinload(Order.items))
+    )
     return result.scalars().all()
 
 
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Order).where(Order.id == order_id))
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(selectinload(Order.items))
+    )
     order = result.scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Order not found")
