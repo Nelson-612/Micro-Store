@@ -52,3 +52,37 @@ class CustomerResponse(BaseModel):
     phone: str | None
 
     model_config = {"from_attributes": True}
+
+
+from datetime import datetime
+
+
+# ── Order Schemas ─────────────────────────────────────────────────────────────
+
+class OrderItemCreate(BaseModel):
+    product_id: int
+    quantity: int
+
+
+class OrderCreate(BaseModel):
+    customer_id: int
+    items: list[OrderItemCreate]
+
+
+class OrderItemResponse(BaseModel):
+    id: int
+    product_id: int
+    quantity: int
+    unit_price: float
+
+    model_config = {"from_attributes": True}
+
+
+class OrderResponse(BaseModel):
+    id: int
+    customer_id: int
+    status: str
+    created_at: datetime
+    items: list[OrderItemResponse]
+
+    model_config = {"from_attributes": True}
