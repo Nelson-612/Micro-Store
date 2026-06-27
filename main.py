@@ -22,3 +22,7 @@ app.include_router(orders.router)
 @app.get("/")
 async def root():
     return {"message": "Micro Store API is running"}
+
+from routers import products, customers, orders, auth
+
+app.include_router(auth.router)
